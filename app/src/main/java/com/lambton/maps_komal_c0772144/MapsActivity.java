@@ -1,14 +1,18 @@
 package com.lambton.maps_komal_c0772144;
 
-import androidx.appcompat.app.AppCompatActivity;
+
+import androidx.fragment.app.FragmentActivity;
 
 import android.os.Bundle;
 
-public class MapsActivity extends AppCompatActivity {
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.OnMapReadyCallback;
+
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleMap.OnMapClickListener, GoogleMap.OnPolylineClickListener, GoogleMap.OnPolygonClickListener{
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_maps);
     }
 }
