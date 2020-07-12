@@ -38,4 +38,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         checkPermissions();
     }
+    private void checkPermissions() {
+        if (!hasLocationPermission()) {
+            requestLocationPermission();
+        } else {
+//            startUpdateLocation();
+        }
+    }
 }
