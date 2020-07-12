@@ -1,19 +1,44 @@
 package com.lambton.maps_komal_c0772144;
 
 
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.FragmentActivity;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.location.Address;
+import android.location.Geocoder;
+import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.widget.Toast;
 
+import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polygon;
+import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 
+import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleMap.OnMapClickListener, GoogleMap.OnPolylineClickListener, GoogleMap.OnPolygonClickListener{
@@ -44,5 +69,267 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         } else {
 //            startUpdateLocation();
         }
+    }
+
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+        mMap = googleMap;
+        mMap.setOnMapClickListener(this);
+        mMap.setOnPolylineClickListener(this);
+        mMap.setOnPolygonClickListener(this);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestLocationPermission();
+            return;
+        }
+        enableUserLocationAndZoom();
+    }
+
+    @Override
+    public void onMapClick(LatLng latLng) {
+        if (mMarkerList.size() < POLYGON_SIDES) {
+            MarkerOptions option = getMarkerOption(latLng);
+            Marker marker = mMap.addMarker(option);
+            marker.setAnchor(0.4f, 1);
+            drawPolyline(marker);
+            setTitleSnippet(latLng, marker);
+            mPreviousMarker = marker;
+            mMarkerList.add(marker);
+            drawPolygon();
+        }
+    }
+
+    private void drawPolygon() {
+        if (mMarkerList.size() == POLYGON_SIDES) {
+            PolygonOptions option = new PolygonOptions();
+            List<LatLng> latLngList = new ArrayList<>();
+//            LatLng [] latLngs = new LatLng[]{mMarkerList.get(0).getPosition(), mMarkerList.get(1).getPosition(), mMarkerList.get(2).getPosition(), mMarkerList.get(3).getPosition()};
+            Marker marker;
+            for (int i = 0; i < 4; i++) {
+                marker = mMarkerList.get(i);
+                setText(marker, i);
+                latLngList.add(marker.getPosition());
+//                option.add(marker.getPosition());
+            }
+            removePolylines();
+//            for(Marker marker: mMarkerList)
+//            {
+//                latLngList.add(marker.getPosition());
+//            }
+            latLngList = orderRectCorners(latLngList);
+            addPolyLines(latLngList);
+            for (LatLng latLng : latLngList) {
+                option.add(latLng);
+            }
+            option.strokeColor(Color.RED);
+            option.fillColor(Color.argb(89, 0, 255, 0));
+            Polygon polygon = mMap.addPolygon(option);
+            polygon.setClickable(true);
+        }
+    }
+
+    private void addPolyLines(List<LatLng> latLngList) {
+        for (int i = 0; i < 4; i++) {
+            if (i == 0) {
+                drawPolyline(latLngList.get(3), latLngList.get(i));
+            } else {
+                drawPolyline(latLngList.get(i), latLngList.get(i - 1));
+            }
+        }
+    }
+
+    private void drawPolyline(LatLng latLng, LatLng latLng1) {
+        PolylineOptions polylineOptions = new PolylineOptions()
+                .color(Color.RED)
+                .width(20)
+                .add(latLng, latLng1);
+        Polyline polyline = mMap.addPolyline(polylineOptions);
+        polyline.setClickable(true);
+        mPolylineList.add(polyline);
+    }
+
+    private void removePolylines() {
+        for (Polyline polyline : mPolylineList) {
+            polyline.remove();
+        }
+        mPolylineList.clear();
+    }
+
+    List<LatLng> orderRectCorners(List<LatLng> corners) {
+
+        List<LatLng> ordCorners = orderPointsByRows(corners);
+
+        if (ordCorners.get(0).latitude > ordCorners.get(1).latitude) { // swap points
+            LatLng tmp = ordCorners.get(0);
+            ordCorners.set(0, ordCorners.get(1));
+            ordCorners.set(1, tmp);
+        }
+
+        if (ordCorners.get(2).latitude < ordCorners.get(3).latitude) { // swap points
+            LatLng tmp = ordCorners.get(2);
+            ordCorners.set(2, ordCorners.get(3));
+            ordCorners.set(3, tmp);
+        }
+        return ordCorners;
+    }
+
+    List<LatLng> orderPointsByRows(List<LatLng> points) {
+        Collections.sort(points, new Comparator<LatLng>() {
+            public int compare(LatLng p1, LatLng p2) {
+                if (p1.longitude < p2.longitude) return -1;
+                if (p1.longitude > p2.longitude) return 1;
+                return 0;
+            }
+        });
+        return points;
+    }
+
+    private void setText(Marker marker, int i) {
+        Bitmap.Config conf = Bitmap.Config.ARGB_8888;
+        Bitmap bmp = Bitmap.createBitmap(150, 173, conf);
+        Canvas canvas1 = new Canvas(bmp);
+
+// paint defines the text color, stroke width and size
+        Paint color = new Paint();
+        color.setTextSize(58);
+        color.setColor(Color.BLACK);
+
+// modify canvas
+        canvas1.drawBitmap(BitmapFactory.decodeResource(getResources(),
+                R.mipmap.marker), 0, 0, color);
+        canvas1.drawText(String.valueOf((char) (i + 65)), 105, 86, color);
+
+        marker.setIcon(BitmapDescriptorFactory.fromBitmap(bmp));
+//        marker.setAnchor(0.5f,1);
+        marker.setAnchor(0.32f, 0.88f);
+    }
+
+    private void drawPolyline(Marker marker) {
+        if (mPreviousMarker != null) {
+            System.out.println("Adding polyline");
+            PolylineOptions polylineOptions = new PolylineOptions()
+                    .color(Color.RED)
+                    .width(20)
+                    .add(marker.getPosition(), mPreviousMarker.getPosition());
+            mPolylineList.add(mMap.addPolyline(polylineOptions));
+        }
+    }
+
+    private MarkerOptions getMarkerOption(LatLng latLng) {
+        MarkerOptions option = new MarkerOptions().position(latLng);
+        option.icon(BitmapDescriptorFactory.fromResource(R.mipmap.marker));
+        return option;
+    }
+
+
+    private void setTitleSnippet(final LatLng latLng, final Marker marker) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Geocoder geocoder = new Geocoder(MapsActivity.this);
+                String[] result = null;
+                try {
+                    Address address = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1).get(0);
+                    result = getFormattedAddress(address);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                if (result == null) {
+                    marker.setTitle("Unknown Location");
+                } else {
+                    System.out.println("Adding Title");
+                    final String[] finalResult = result;
+                    MapsActivity.this.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            marker.setTitle(finalResult[0]);
+                            marker.setSnippet(finalResult[1]);
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    private String[] getFormattedAddress(Address address) {
+        StringBuilder title = new StringBuilder("");
+        StringBuilder snippet = new StringBuilder("");
+        if (address.getSubThoroughfare() != null) {
+            title.append(address.getSubThoroughfare());
+        }
+        if (address.getThoroughfare() != null) {
+            if (!title.equals("") || !title.equals(" ")) {
+                title.append(", ");
+            }
+            title.append(address.getThoroughfare());
+        }
+        if (address.getPostalCode() != null) {
+            if (!title.equals("") || !title.equals(" ")) {
+                title.append(", ");
+            }
+            title.append(address.getPostalCode());
+        }
+        if (address.getLocality() != null) {
+            snippet.append(address.getLocality());
+        }
+        if (address.getAdminArea() != null) {
+            if (!snippet.equals("") || !snippet.equals(" ")) {
+                snippet.append(", ");
+            }
+            snippet.append(address.getAdminArea());
+        }
+        return new String[]{title.toString(), snippet.toString()};
+    }
+
+    private static void dump(Object o) {
+        if (o == null) {
+            System.out.println("dump object is null");
+            return;
+        }
+        Field[] fields = o.getClass().getDeclaredFields();
+        for (int i = 0; i < fields.length; i++) {
+            try {
+                System.out.println(fields[i].getName() + " - " + fields[i].get(o));
+            } catch (Exception e) {
+            }
+        }
+    }
+
+    private void requestLocationPermission() {
+        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_CODE);
+    }
+
+    private boolean hasLocationPermission() {
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode == REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (mMap != null) {
+                    enableUserLocationAndZoom();
+                }
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void enableUserLocationAndZoom() {
+        mMap.setMyLocationEnabled(true);
+        Location location = mLocationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(location.getLatitude(), location.getLongitude()), DEFAULT_ZOOM_LEVEL));
+    }
+
+    @Override
+    public void onPolylineClick(Polyline polyline) {
+        System.out.println("clicked");
+        Toast.makeText(this, "hello world", Toast.LENGTH_SHORT).show();
+    }
+
+
+    @Override
+    public void onPolygonClick(Polygon polygon) {
+        System.out.println("polygon");
+        Toast.makeText(this, "Polygon", Toast.LENGTH_SHORT).show();
     }
 }
