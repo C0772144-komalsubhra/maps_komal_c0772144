@@ -7,7 +7,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.fragment.app.FragmentActivity;
+
 
 import android.Manifest;
 import android.content.Context;
@@ -53,8 +53,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 {
     private static final int REQUEST_CODE = 1;
     private static final int POLYGON_SIDES = 4;
-    Polyline line;
-    Polygon shape;
+    Polyline polyline;
+    Polygon polygon;
     List<Marker> markersList = new ArrayList<>();
     List<Marker> distanceMarkers = new ArrayList<>();
     ArrayList<Polyline> polylinesList = new ArrayList<>();
@@ -114,14 +114,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             requestLocationPermission();
         } else {
             startUpdateLocations();
-            LatLng canadaCenterLatLong = new LatLng( 43.651070,-79.347015);
-            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(canadaCenterLatLong, 5));
+            LatLng latLng = new LatLng( 43.651070,-79.347015);
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 5));
         }
 
         mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(Marker marker) {
-                System.out.println("marker Clicked"+marker.isInfoWindowShown());
+
                 if(marker.isInfoWindowShown()){
                     marker.hideInfoWindow();
                 }
@@ -152,14 +152,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     }
                     polylinesList.clear();
 
-                    shape.remove();
-                    shape = null;
+                    polygon.remove();
+                    polygon = null;
 
                     for(Marker currMarker: distanceMarkers){
                         currMarker.remove();
                     }
                     distanceMarkers.clear();
-                    drawShape();
+                    draw();
                 }
             }
         });
@@ -185,22 +185,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         return BitmapDescriptorFactory.fromBitmap(image);
     }
 
-    private void startUpdateLocations() {
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0, locationListener);
-
-    }
-
-    private void requestLocationPermission() {
-        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_CODE);
-    }
-
-    private boolean hasLocationPermission() {
-        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -287,12 +272,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         markersList.add(mm);
 
         if (markersList.size() == POLYGON_SIDES) {
-            drawShape();
+            draw();
         }
 
 
-        Character cityLetters = 'A';
-        Character[] arr = {'A','B','C','D'};
+        Character cityLetters = '1';
+        Character[] arr = {'1','2','3','4'};
         for(Character letter: arr){
             if(letterList.contains(letter)){
                 continue;
@@ -314,7 +299,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
 
-    private void drawShape (){
+    private void draw(){
         PolygonOptions options = new PolygonOptions()
                 .fillColor(Color.argb(35, 0, 255, 0))
                 .strokeColor(Color.RED);
@@ -335,18 +320,18 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             if (markersList.get(i).getPosition().latitude < markersList.get(l).getPosition().latitude)
                 l = i;
 
-        Marker currentMarker = markersList.get(l);
-        sortedLatLong2.add(currentMarker.getPosition());
+        Marker marker = markersList.get(l);
+        sortedLatLong2.add(marker.getPosition());
         while(sortedLatLong2.size() != POLYGON_SIDES){
             double minDistance = Double.MAX_VALUE;
             Marker nearestMarker  = null;
-            for(Marker marker: markersList){
+            for(Marker marker1: markersList){
                 if(sortedLatLong2.contains(marker.getPosition())){
                     continue;
                 }
 
-                double curDistance = distance(currentMarker.getPosition().latitude,
-                        currentMarker.getPosition().longitude,
+                double curDistance = distance(marker.getPosition().latitude,
+                        marker.getPosition().longitude,
                         marker.getPosition().latitude,
                         marker.getPosition().longitude);
 
@@ -358,13 +343,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             if(nearestMarker != null){
                 sortedLatLong2.add(nearestMarker.getPosition());
-                currentMarker = nearestMarker;
+                marker = nearestMarker;
             }
         }
         System.out.println(sortedLatLong);
         options.addAll(sortedLatLong);
-        shape = mMap.addPolygon(options);
-        shape.setClickable(true);
+        polygon = mMap.addPolygon(options);
+        polygon.setClickable(true);
 
         LatLng[] polyLinePoints = new LatLng[sortedLatLong.size() + 1];
         int index = 0;
@@ -400,8 +385,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
         polylinesList.clear();
 
-        shape.remove();
-        shape = null;
+        polygon.remove();
+        polygon = null;
 
         for (Marker marker : distanceMarkers) {
             marker.remove();
@@ -414,6 +399,23 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         cityMarkers.clear();
         letterList.clear();
 
+    }
+
+    private void startUpdateLocations() {
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0, locationListener);
+
+    }
+
+    private void requestLocationPermission() {
+        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_CODE);
+    }
+
+    private boolean hasLocationPermission() {
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
 
@@ -463,9 +465,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                             }
                             polylinesList.clear();
 
-                            if(shape != null){
-                                shape.remove();
-                                shape = null;
+                            if(polygon != null){
+                                polygon.remove();
+                                polygon = null;
                             }
 
                             for(Marker currMarker: distanceMarkers){
@@ -493,12 +495,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private double distance(double lat1, double lon1, double lat2, double lon2) {
-        double theta = lon1 - lon2;
+        double d = lon1 - lon2;
         double dist = Math.sin(deg2rad(lat1))
                 * Math.sin(deg2rad(lat2))
                 + Math.cos(deg2rad(lat1))
                 * Math.cos(deg2rad(lat2))
-                * Math.cos(deg2rad(theta));
+                * Math.cos(deg2rad(d));
         dist = Math.acos(dist);
         dist = rad2deg(dist);
         dist = dist * 60 * 1.1515;
